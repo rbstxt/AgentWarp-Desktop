@@ -1,130 +1,77 @@
-name: Build (Manual)
+name: Build
 
+# Every push and pull request builds the macOS apps (artifacts on the run).
+# Pushing a tag like v0.1.0 also publishes them as a GitHub Release.
 on:
+  push:
+    branches: [main]
+    tags: ['v*']
+  pull_request:
   workflow_dispatch:
 
+permissions:
+  contents: write
+
 jobs:
-  build-linux:
+  mac:
+    name: macOS ${{ matrix.arch }}
+    runs-on: macos-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        arch: [arm64, x64]
+    steps:
+      - name: Checkout (with the agentwarp submodule)
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+          persist-credentials: false
+      - name: Install Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - name: Install dependencies
+        run: npm ci
+      - name: Fetch library files, packager and extensions
+        run: npm run fetch
+      - name: Compile the editor
+        run: npm run webpack:prod
+        env:
+          NODE_OPTIONS: --openssl-legacy-provider
+      - name: Stage the agentwarp engine and panel
+        run: node scripts/stage-agentwarp.mjs --arch=${{ matrix.arch }}
+      - name: Package
+        run: node release-automation/build.mjs --mac --${{ matrix.arch }} --production
+        # Without Apple signing secrets the app is signed ad hoc (see README: first launch).
+        env:
+          CSC_IDENTITY_AUTO_DISCOVERY: 'false'
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: AgentWarp-mac-${{ matrix.arch }}
+          path: dist/*.dmg
+          if-no-files-found: error
+
+  release:
+    name: Publish release
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: mac
     runs-on: ubuntu-latest
     steps:
-    - name: Checkout
-      uses: actions/checkout@v4
-      with:
-        submodules: recursive
-        persist-credentials: false
-    - name: Install strip-nondeterminism
-      run: sudo apt-get install strip-nondeterminism
-    - name: Install Node.js
-      uses: actions/setup-node@v4
-      with:
-        node-version: 24
-    - name: Install dependencies
-      run: npm ci --loglevel=info
-    - name: Fetch
-      run: npm run fetch
-    - name: Compile
-      run: npm run webpack:prod
-    - name: Package
-      run: |
-        node release-automation/build.mjs --debian --tarball --appimage --x64 --armv7l --arm64
-    - name: Print file tree
-      run: node scripts/print-file-tree.mjs dist
-    - name: Upload artifacts to GitHub Actions
-      uses: actions/upload-artifact@v4
-      with:
-        name: linux
-        path: |
-          dist/*.deb
-          dist/*.tar.gz
-          dist/*.AppImage
+      - name: Download artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+          merge-multiple: true
+      - name: Create the GitHub Release
+        run: |
+          gh release create "$GITHUB_REF_NAME" artifacts/*.dmg \
+            --repo "$GITHUB_REPOSITORY" \
+            --title "AgentWarp $GITHUB_REF_NAME" \
+            --notes "Download the .dmg for your Mac: **arm64** for Apple Silicon (M1 and later), **x64** for Intel.
 
-  build-mac:
-    runs-on: macos-latest
-    steps:
-    - name: Checkout
-      uses: actions/checkout@v4
-      with:
-        submodules: recursive
-        persist-credentials: false
-    - name: Install Node.js
-      uses: actions/setup-node@v4
-      with:
-        node-version: 24
-    - name: Install dependencies
-      run: npm ci --loglevel=info
-    - name: Fetch
-      run: npm run fetch
-    - name: Compile
-      run: npm run webpack:prod
-    - name: Package
-      run: |
-        # Need to run the universal builds as separate commands or it breaks when @electron/universal
-        # diffs the ASARs and finds spurious differences. Not clear why.
-        node release-automation/build.mjs --mac --universal --production
-        node release-automation/build.mjs --mac-legacy-11 --universal --production
-        node release-automation/build.mjs --mac-legacy-10.13-10.14 --mac-legacy-10.15 --x64
-    - name: Print file tree
-      run: node scripts/print-file-tree.mjs dist
-    - name: Upload artifacts to GitHub Actions
-      uses: actions/upload-artifact@v4
-      with:
-        name: mac
-        path: dist/*.dmg
+          Before the first run, install and sign in to at least one agent CLI (Claude Code, Codex or OpenCode). See the [setup guide](https://github.com/$GITHUB_REPOSITORY#install).
 
-  build-windows:
-    # GitHub's Windows runners have a C: drive and a D: drive.
-    # C: is for the OS and has good read performance but awful write performance.
-    # D: has much better faster write performance (>20x faster than C:)
-    # We want to use the D: drive whenever we can. Trying to do "npm ci" on the C:
-    # drive has been observed to take over an hour!
-    runs-on: windows-latest
-    steps:
-    # actions/checkout can only clone to paths in $GITHUB_WORKSPACE which is on the C: drive,
-    # so we have to clone to C: then copy to D: after. This repository itself isn't huge so
-    # this is plenty fast.
-    - name: Checkout
-      uses: actions/checkout@v4
-      with:
-        submodules: recursive
-        persist-credentials: false
-        path: repo
-    - name: "Move repository to D: drive"
-      run: |
-        Copy-Item -Path repo -Destination D:\repo -Recurse
-        Remove-Item -Path repo -Recurse -Force
-    - name: Install Node.js
-      uses: actions/setup-node@v4
-      with:
-        node-version: 24
-    # The repository being on D: means that node_modules IO will be fast, but npm still downloads
-    # packages to a temporary folder for caching which is on C: by default. We need to make sure
-    # npm uses the D: drive instead otherwise we still get bottlenecked by C:.
-    - name: "Configure npm to use D: drive"
-      run: |
-        npm config set cache D:\npm-cache
-        npm config set prefix D:\npm-prefix
-    - name: Install dependencies
-      working-directory: D:\repo
-      run: npm ci --loglevel=info
-    - name: Fetch
-      working-directory: D:\repo
-      run: npm run fetch
-    - name: Compile
-      working-directory: D:\repo
-      run: npm run webpack:prod
-    - name: Package
-      working-directory: D:\repo
-      run: |
-        node release-automation/build.mjs --windows --microsoft-store --x64 --ia32 --arm64
-        node release-automation/build.mjs --windows-portable --x64
-        node release-automation/build.mjs --windows-legacy --ia32 --x64
-    - name: Print file tree
-      working-directory: D:\repo
-      run: node scripts/print-file-tree.mjs dist
-    - name: Upload artifacts to GitHub Actions
-      uses: actions/upload-artifact@v4
-      with:
-        name: windows
-        path: |
-          D:\repo\dist\*.exe
-          D:\repo\dist\*.appx
+          The app is not notarized yet: the first time, right-click AgentWarp in Applications and choose **Open**."
+        env:
+          GH_TOKEN: ${{ github.token }}

@@ -18,3 +18,8 @@ a {
 p {
   margin: 0;
 }
+
+/* AgentWarp: the TurboWarp feedback button links to TurboWarp's author; not for AgentWarp users. */
+[class*="menu-bar_menu-bar-item_"]:has(> [class*="menu-bar_feedback-link_"]) {
+  display: none;
+}

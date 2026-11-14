@@ -4,7 +4,7 @@ const nodeURL = require('url');
 const zlib = require('zlib');
 const nodeCrypto = require('crypto');
 const {app, dialog} = require('electron');
-const {AgentWarpEngine, getClientCode} = require('../agentwarp');
+const {AgentWarpEngine, getClientCode, openInTerminal} = require('../agentwarp');
 const ProjectRunningWindow = require('./project-running-window');
 const AddonsWindow = require('./addons');
 const DesktopSettingsWindow = require('./desktop-settings');
@@ -243,6 +243,7 @@ class EditorWindow extends ProjectRunningWindow {
     this.window.on('closed', () => this.agentwarp.stop());
     this.ipc.handle('agentwarp-connection', () => this.agentwarp.getConnection());
     this.ipc.handle('agentwarp-client', () => getClientCode());
+    this.ipc.handle('agentwarp-open-terminal', (event, command) => openInTerminal(String(command)));
     // The path of the file open in the editor ('' when unsaved): one mirror per file.
     this.ipc.handle('agentwarp-project-key', () => {
       const file = this.activeFileId !== null && this.openedFiles.get(this.activeFileId);

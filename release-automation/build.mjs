@@ -178,6 +178,13 @@ const afterPackForUniversalMac = async (context) => {
 };
 
 const afterSign = async (context) => {
+  // AgentWarp: without an Apple Developer ID (no CSC_LINK), sign ad hoc so the app runs on Apple
+  // Silicon; users open it once via right-click > Open (see README).
+  if (context.electronPlatformName === 'darwin' && !process.env.CSC_LINK) {
+    const app = pathUtil.join(context.appOutDir, `${context.packager.appInfo.productFilename}.app`);
+    childProcess.execFileSync('codesign', ['--force', '--deep', '--sign', '-', app], {stdio: 'inherit'});
+  }
+
   // Ensure that modification times are still reproducible after signing and resource
   // editing.
   recursivelySetFileTimes(context.appOutDir, sourceDateEpoch);
@@ -277,7 +284,13 @@ const buildMicrosoftStore = () => build({
 const buildMac = () => build({
   platformName: 'MAC',
   platformType: 'dmg',
-  manageUpdates: true
+  // AgentWarp: TurboWarp's update server does not know about AgentWarp releases.
+  manageUpdates: false,
+  extraConfig: {
+    mac: {
+      artifactName: '${productName}-${version}-${arch}.${ext}'
+    }
+  }
 });
 
 const buildMacLegacy10131014 = () => build({

@@ -1,11 +1,10 @@
 {
   "name": "agentwarp-desktop",
-  "description": "Scratch mod with a compiler, dark mode, a bunch of addons, and more.",
-  "version": "1.17.1",
+  "description": "TurboWarp with a coding agent built in: open an .sb3 and ask Claude, Codex or OpenCode.",
+  "version": "0.1.0",
   "license": "GPL-3.0",
   "author": {
-    "email": "contact@turbowarp.org",
-    "name": "Thomas Weber"
+    "name": "rbstxt (AgentWarp), Thomas Weber (TurboWarp Desktop)"
   },
   "type": "commonjs",
   "scripts": {
@@ -15,7 +14,8 @@
     "webpack:prod": "cross-env NODE_ENV=production webpack",
     "electron:start": "electron src-main/entrypoint.js",
     "start": "electron src-main/entrypoint.js",
-    "electron:package:dir": "electron-builder --dir"
+    "electron:package:dir": "electron-builder --dir",
+    "stage-agentwarp": "node scripts/stage-agentwarp.mjs"
   },
   "dependencies": {
     "semver": "^7.7.3"
@@ -50,14 +50,13 @@
       "terser-webpack-plugin": "^4.2.3"
     }
   },
-  "homepage": "https://desktop.turbowarp.org/",
+  "homepage": "https://github.com/rbstxt/AgentWarp-Desktop",
   "repository": {
     "type": "git",
-    "url": "https://github.com/TurboWarp/desktop.git"
+    "url": "https://github.com/rbstxt/AgentWarp-Desktop.git"
   },
   "bugs": {
-    "url": "https://github.com/TurboWarp/desktop/issues",
-    "email": "contact@turbowarp.org"
+    "url": "https://github.com/rbstxt/AgentWarp-Desktop/issues"
   },
   "main": "./src-main/entrypoint.js",
   "build": {
@@ -80,6 +79,13 @@
       {
         "from": "art/icon.svg",
         "to": "icon.svg"
+      },
+      {
+        "from": "dist-agentwarp",
+        "to": "agentwarp",
+        "filter": [
+          "**/*"
+        ]
       }
     ],
     "win": {

@@ -9,7 +9,8 @@ const stringifyError = (error) => (error && error.stack) ? error.stack : error;
 
 // AgentWarp keeps its own settings, addons and projects, separate from an installed TurboWarp.
 app.setName('AgentWarp');
-app.setPath('userData', require('path').join(app.getPath('appData'), 'agentwarp-desktop'));
+// AGENTWARP_USER_DATA: a separate profile (tests, or a second copy next to the one in use).
+app.setPath('userData', process.env.AGENTWARP_USER_DATA || require('path').join(app.getPath('appData'), 'agentwarp-desktop'));
 
 try {
   process.on('unhandledRejection', (error) => {

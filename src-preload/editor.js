@@ -29,7 +29,9 @@ contextBridge.exposeInMainWorld('EditorPreload', {
 contextBridge.exposeInMainWorld('AgentWarpDesktop', {
   config: () => ipcRenderer.invoke('agentwarp-connection'),
   projectKey: () => ipcRenderer.invoke('agentwarp-project-key'),
-  getClient: () => ipcRenderer.invoke('agentwarp-client')
+  getClient: () => ipcRenderer.invoke('agentwarp-client'),
+  // Onboarding: run an agent CLI's install / sign-in command in Terminal (fixed allowlist in main).
+  openTerminal: (command) => ipcRenderer.invoke('agentwarp-open-terminal', command)
 });
 
 let exportForPackager = () => Promise.reject(new Error('exportForPackager missing'));

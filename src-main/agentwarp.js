@@ -28,8 +28,9 @@ const findHome = () => {
   const candidates = [
     process.env.AGENTWARP_HOME,
     app.isPackaged ? path.join(process.resourcesPath, 'agentwarp') : null,
-    // Development: the fork sits next to the agentwarp repository.
+    // Development: a checkout next to the fork (live edits), else the pinned submodule.
     app.isPackaged ? null : path.resolve(__dirname, '..', '..', 'agentwarp'),
+    app.isPackaged ? null : path.resolve(__dirname, '..', 'agentwarp'),
     remembered
   ].filter(Boolean);
   for (const dir of candidates) {
@@ -213,7 +214,39 @@ const getClientCode = async () => {
   return '';
 };
 
+/**
+ * Onboarding: run an agent CLI's install or sign-in command in the user's terminal, where they can
+ * see it and answer its prompts. Only these exact commands are accepted from the page.
+ */
+const TERMINAL_COMMANDS = new Set([
+  'npm install -g @anthropic-ai/claude-code@latest',
+  'claude auth login',
+  'npm install -g @openai/codex@latest',
+  'codex login',
+  'npm install -g opencode-ai@latest',
+  'opencode auth login'
+]);
+
+const openInTerminal = async (command) => {
+  if (!TERMINAL_COMMANDS.has(command)) throw new Error('Command not allowed');
+  if (process.platform !== 'darwin') throw new Error('Opening a terminal is only supported on macOS');
+  const file = path.join(os.tmpdir(), `agentwarp-${crypto.randomBytes(6).toString('hex')}.command`);
+  await fs.promises.writeFile(file, [
+    '#!/bin/zsh -l',
+    `echo '$ ${command}'`,
+    command,
+    'echo',
+    'echo "AgentWarp: done. Close this window and press \"Check again\" in the agent panel."',
+    `rm -f '${file}'`,
+    ''
+  ].join('\n'), {mode: 0o700});
+  await new Promise((resolve, reject) => {
+    childProcess.execFile('open', ['-a', 'Terminal', file], (error) => error ? reject(error) : resolve());
+  });
+};
+
 module.exports = {
   AgentWarpEngine,
-  getClientCode
+  getClientCode,
+  openInTerminal
 };
