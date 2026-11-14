@@ -1,11 +1,12 @@
 name: Build
 
 # Every push and pull request builds the macOS apps (artifacts on the run).
-# Pushing a tag like v0.1.0 also publishes them as a GitHub Release.
+# Pushing a tag like agentwarp-v0.1.0 also publishes them as a GitHub Release
+# (prefixed so TurboWarp's own v* tags from upstream never trigger a release).
 on:
   push:
     branches: [main]
-    tags: ['v*']
+    tags: ['agentwarp-v*']
   pull_request:
   workflow_dispatch:
 
@@ -54,7 +55,7 @@ jobs:
 
   release:
     name: Publish release
-    if: startsWith(github.ref, 'refs/tags/v')
+    if: startsWith(github.ref, 'refs/tags/agentwarp-v')
     needs: mac
     runs-on: ubuntu-latest
     steps:
@@ -67,7 +68,7 @@ jobs:
         run: |
           gh release create "$GITHUB_REF_NAME" artifacts/*.dmg \
             --repo "$GITHUB_REPOSITORY" \
-            --title "AgentWarp $GITHUB_REF_NAME" \
+            --title "AgentWarp ${GITHUB_REF_NAME#agentwarp-}" \
             --notes "Download the .dmg for your Mac: **arm64** for Apple Silicon (M1 and later), **x64** for Intel.
 
           Before the first run, install and sign in to at least one agent CLI (Claude Code, Codex or OpenCode). See the [setup guide](https://github.com/$GITHUB_REPOSITORY#install).

@@ -115,7 +115,7 @@ one, else the submodule (set up its packages per its README), or `AGENTWARP_HOME
 
 Release build: `node scripts/stage-agentwarp.mjs --arch=arm64` then
 `node release-automation/build.mjs --mac --arm64 --production`. CI (`.github/workflows/build.yml`) builds
-arm64 and x64 on every push; pushing a `v*` tag publishes a GitHub Release.
+arm64 and x64 on every push; pushing an `agentwarp-v*` tag (e.g. `agentwarp-v0.1.0`) publishes a GitHub Release.
 
 ## License
 
