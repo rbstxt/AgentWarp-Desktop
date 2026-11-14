@@ -25,6 +25,13 @@ contextBridge.exposeInMainWorld('EditorPreload', {
   setIsFullScreen: (isFullScreen) => ipcRenderer.invoke('set-is-full-screen', isFullScreen)
 });
 
+// AgentWarp: connection to this window's engine, the path of the open file, the panel bundle.
+contextBridge.exposeInMainWorld('AgentWarpDesktop', {
+  config: () => ipcRenderer.invoke('agentwarp-connection'),
+  projectKey: () => ipcRenderer.invoke('agentwarp-project-key'),
+  getClient: () => ipcRenderer.invoke('agentwarp-client')
+});
+
 let exportForPackager = () => Promise.reject(new Error('exportForPackager missing'));
 
 ipcRenderer.on('export-project-to-port', (e) => {

@@ -110,7 +110,8 @@ const flipFuses = async (context) => {
   newFuses[electronFuses.FuseV1Options.LoadBrowserProcessSpecificV8Snapshot] = false;
 
   // Disable various Node.js features that we do not use
-  newFuses[electronFuses.FuseV1Options.RunAsNode] = false;
+  // AgentWarp runs its engine on Electron's own Node (ELECTRON_RUN_AS_NODE).
+  newFuses[electronFuses.FuseV1Options.RunAsNode] = true;
   newFuses[electronFuses.FuseV1Options.EnableNodeOptionsEnvironmentVariable] = false;
   newFuses[electronFuses.FuseV1Options.EnableNodeCliInspectArguments] = false;
 

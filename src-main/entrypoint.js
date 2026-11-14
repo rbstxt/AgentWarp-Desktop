@@ -4,8 +4,12 @@
 
 const {app, dialog} = require('electron');
 
-const APP_NAME = 'TurboWarp Desktop';
+const APP_NAME = 'AgentWarp';
 const stringifyError = (error) => (error && error.stack) ? error.stack : error;
+
+// AgentWarp keeps its own settings, addons and projects, separate from an installed TurboWarp.
+app.setName('AgentWarp');
+app.setPath('userData', require('path').join(app.getPath('appData'), 'agentwarp-desktop'));
 
 try {
   process.on('unhandledRejection', (error) => {
