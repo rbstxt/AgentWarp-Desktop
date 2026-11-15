@@ -47,11 +47,20 @@ jobs:
       run:
         shell: bash
     steps:
-      - name: Checkout (with the agentwarp submodule)
+      - name: Checkout
         uses: actions/checkout@v4
         with:
-          submodules: recursive
           persist-credentials: false
+      # The agentwarp submodule, without eval/ (not part of the app; some of its file names are
+      # not valid on Windows).
+      - name: Checkout the agentwarp submodule
+        run: |
+          sha=$(git rev-parse HEAD:agentwarp)
+          url=$(git config -f .gitmodules submodule.agentwarp.url)
+          rm -rf agentwarp
+          git clone --no-checkout --filter=blob:none "$url" agentwarp
+          git -C agentwarp sparse-checkout set --no-cone '/*' '!/eval/'
+          git -C agentwarp checkout --quiet "$sha"
       - name: Install Node.js
         uses: actions/setup-node@v4
         with:
