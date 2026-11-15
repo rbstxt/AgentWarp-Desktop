@@ -239,7 +239,7 @@ class EditorWindow extends ProjectRunningWindow {
     this.openedProjectAt = Date.now();
 
     // AgentWarp: this window's engine (hidden text mirror of the open project + coding agents).
-    this.agentwarp = new AgentWarpEngine();
+    this.agentwarp = AgentWarpEngine.forWindow();
     this.window.on('closed', () => this.agentwarp.stop());
     this.ipc.handle('agentwarp-connection', () => this.agentwarp.getConnection());
     this.ipc.handle('agentwarp-client', () => getClientCode());

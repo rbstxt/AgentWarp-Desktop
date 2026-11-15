@@ -99,6 +99,29 @@ const getFreePort = () => new Promise((resolve, reject) => {
 });
 
 const engines = new Set();
+/** Started with the app, so the first window's agent panel connects at once. */
+let spare = null;
+
+/** Engine output, kept in <userData>/logs/agentwarp-engine.log (trimmed when it grows past 1 MB). */
+const logFile = () => path.join(app.getPath('userData'), 'logs', 'agentwarp-engine.log');
+let logChecked = false;
+const writeLog = (line) => {
+  try {
+    const file = logFile();
+    if (!logChecked) {
+      logChecked = true;
+      fs.mkdirSync(path.dirname(file), {recursive: true});
+      try {
+        if (fs.statSync(file).size > 1e6) fs.renameSync(file, `${file}.old`);
+      } catch (e) {
+        // no log yet
+      }
+    }
+    fs.appendFileSync(file, `${new Date().toISOString()} ${line}\n`);
+  } catch (e) {
+    // logging is best effort
+  }
+};
 
 class AgentWarpEngine {
   constructor () {
@@ -107,14 +130,28 @@ class AgentWarpEngine {
     this.process = null;
     this.stopped = false;
     this.restarts = 0;
+    // Exits soon after starting, in a row: the engine cannot run, so tell the panel why.
+    this.quickExits = 0;
+    this.error = null;
     this.lines = [];
     this.ready = this.start();
     engines.add(this);
   }
 
+  /**
+   * The engine for a new editor window: the one started with the app if it is still unused,
+   * else a fresh one.
+   */
+  static forWindow () {
+    const engine = spare && !spare.stopped ? spare : new AgentWarpEngine();
+    if (engine === spare) spare = null;
+    return engine;
+  }
+
   log (line) {
     this.lines.push(line);
     if (this.lines.length > 200) this.lines.shift();
+    writeLog(`[${this.port}] ${line}`);
     if (!app.isPackaged) console.log(`[agentwarp:${this.port}] ${line}`);
   }
 
@@ -140,16 +177,24 @@ class AgentWarpEngine {
         ...process.env,
         PATH,
         ELECTRON_RUN_AS_NODE: '1',
-        AGENTWARP_TOKEN: this.token
+        AGENTWARP_TOKEN: this.token,
+        // The engine stops by itself if the app dies without stopping it.
+        AGENTWARP_PARENT_PID: String(process.pid)
       },
       stdio: ['ignore', 'pipe', 'pipe'],
       // Own process group, so stopping the engine also stops the agents it started.
       detached: process.platform !== 'win32'
     });
     this.process = child;
+    const startedAt = Date.now();
+    const runLines = [];
+    child.on('error', (error) => this.log(`could not start the engine: ${error.message}`));
     const onData = (data) => {
       for (const line of data.toString().split('\n')) {
-        if (line.trim()) this.log(line);
+        if (!line.trim()) continue;
+        this.log(line);
+        runLines.push(line);
+        if (runLines.length > 12) runLines.shift();
       }
     };
     child.stdout.on('data', onData);
@@ -158,12 +203,24 @@ class AgentWarpEngine {
       if (this.process === child) this.process = null;
       if (this.stopped) return;
       this.log(`engine exited (${signal || code}); restarting`);
+      if (Date.now() - startedAt < 15000) this.quickExits++;
+      else this.quickExits = 0;
+      if (this.quickExits >= 3) {
+        // What the last run printed (they all fail the same way).
+        this.error = `${runLines.join('\n') || `exited (${signal || code})`}\n\nLog: ${logFile()}`;
+      }
       // Same port and token: the panel reconnects by itself and re-sends the open project.
       const delay = Math.min(30000, 500 * 2 ** this.restarts++);
       setTimeout(() => {
         if (!this.stopped) this.ready = this.start();
       }, delay);
     });
+    setTimeout(() => {
+      if (this.process !== child) return;
+      // Running for a while: it works now.
+      this.quickExits = 0;
+      this.error = null;
+    }, 15000);
     setTimeout(() => {
       if (this.process === child) this.restarts = 0;
     }, 60000);
@@ -173,9 +230,14 @@ class AgentWarpEngine {
     };
   }
 
-  /** For the preload: where this window's engine listens. */
+  /**
+   * For the preload: where this window's engine listens, plus `error` when it cannot run
+   * (null with no error: still starting, the panel asks again).
+   */
   async getConnection () {
-    return this.ready;
+    const connection = await this.ready;
+    if (this.error) return {...connection, error: this.error};
+    return connection;
   }
 
   stop () {
@@ -195,6 +257,11 @@ class AgentWarpEngine {
 
 app.on('will-quit', () => {
   for (const engine of [...engines]) engine.stop();
+});
+
+// Start an engine together with the app (before the first window asks for one).
+app.whenReady().then(() => {
+  if (!spare && engines.size === 0) spare = new AgentWarpEngine();
 });
 
 /** The panel bundle, injected into each editor window (read fresh, so rebuilding it needs no restart). */

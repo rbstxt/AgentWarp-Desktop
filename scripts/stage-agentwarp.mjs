@@ -86,7 +86,8 @@ fs.cpSync(path.join(src, 'packages', 'bridge'), path.join(out, 'packages', 'brid
   }
 });
 copy('packages/panel/dist', {only: true});
-for (const file of ['LICENSE', 'THIRD_PARTY_NOTICES', 'README.md']) {
+// package.json marks the tree as ES modules (the app's own package.json says commonjs).
+for (const file of ['package.json', 'LICENSE', 'THIRD_PARTY_NOTICES', 'README.md']) {
   fs.copyFileSync(path.join(src, file), path.join(out, file));
 }
 

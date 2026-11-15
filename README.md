@@ -51,6 +51,8 @@ CLI のインストールには [Node.js](https://nodejs.org/)（npm）が必要
   `~/Library/Application Support/agentwarp-desktop/projects/`）です。作品ごとに 1 つで、同じファイルを開き直すと
   会話の続きができます。
 - **料金は？** AgentWarp は無料です。エージェントの利用分は、各 CLI のプランや API キーの扱いに従います。
+- **パネルに「エンジンを起動できませんでした」と出たら？** AgentWarp を再起動してください。直らない場合は
+  `~/Library/Application Support/agentwarp-desktop/logs/agentwarp-engine.log` を添えて Issue で報告してください。
 
 ---
 
@@ -82,12 +84,15 @@ AgentWarp drives the agent CLIs installed on your Mac with their own sign-in. In
 Open a project (or start a new one), pick an agent and model in the panel on the right, describe what
 you want, and save with **⌘S** as usual. The panel shows what changed and can undo a turn. If an agent
 shows "not installed" or "sign-in required", run the command it shows in Terminal and press "Check again".
+If the panel says the engine could not start, restart AgentWarp; if that does not help, open an issue with
+`~/Library/Application Support/agentwarp-desktop/logs/agentwarp-engine.log`.
 
 ---
 
 ## How it works
 
-- Each editor window starts its own engine (`agentwarp app` from
+- The app starts an engine as soon as it launches, so the first window's panel connects at once; each
+  further editor window starts its own engine (`agentwarp app` from
   [AgentWarp](https://github.com/rbstxt/AgentWarp), a submodule here) on Electron's built-in Node, on a
   random local port with a random token only that window knows (`src-main/agentwarp.js`).
 - The engine keeps a hidden text mirror of the open project (one per file; unsaved projects get a
