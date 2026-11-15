@@ -247,7 +247,8 @@ const build = async ({
 const buildWindows = () => build({
   platformName: 'WINDOWS',
   platformType: 'nsis',
-  manageUpdates: true
+  // AgentWarp: TurboWarp's update checker would look for TurboWarp releases.
+  manageUpdates: false
 });
 
 const buildWindowsLegacy = () => build({
@@ -347,7 +348,7 @@ const buildDebian = () => build({
 const buildTarball = () => build({
   platformName: 'LINUX',
   platformType: 'tar.gz',
-  manageUpdates: true,
+  manageUpdates: false,
   extraConfig: {
     // gzip header contains various non-deterministic fields that we would like to remove.
     // TODO: would be nice to reimplement this small part of strip-nondeterminism in JS to remove dependency.
@@ -376,7 +377,8 @@ const buildTarball = () => build({
 const buildAppImage = () => build({
   platformName: 'LINUX',
   platformType: 'appimage',
-  manageUpdates: true
+  // AgentWarp: TurboWarp's update checker would look for TurboWarp releases.
+  manageUpdates: false
 });
 
 const buildLinuxDir = () => build({

@@ -60,6 +60,8 @@ const getHome = () => {
  * PATH (npx, opencode, Homebrew, nvm, ...). Ask the login shell once.
  */
 let shellPathPromise;
+/** Windows spells it Path; setting a second PATH key would leave which one wins to chance. */
+const PATH_KEY = process.platform === 'win32' ? (Object.keys(process.env).find((k) => k.toUpperCase() === 'PATH') || 'Path') : 'PATH';
 const getShellPath = () => {
   if (!shellPathPromise) {
     shellPathPromise = new Promise((resolve) => {
@@ -72,7 +74,9 @@ const getShellPath = () => {
         path.join(os.homedir(), '.opencode', 'bin')
       ].filter(Boolean).join(path.delimiter);
       if (process.platform === 'win32') {
-        resolve(process.env.PATH || '');
+        // npm installs agent CLIs into %APPDATA%\npm, which a fresh install may not have on PATH yet.
+        const npmDir = process.env.APPDATA ? path.join(process.env.APPDATA, 'npm') : null;
+        resolve([process.env[PATH_KEY], npmDir].filter(Boolean).join(path.delimiter));
         return;
       }
       const shell = process.env.SHELL || '/bin/zsh';
@@ -175,7 +179,7 @@ class AgentWarpEngine {
       cwd: dir,
       env: {
         ...process.env,
-        PATH,
+        [PATH_KEY]: PATH,
         ELECTRON_RUN_AS_NODE: '1',
         AGENTWARP_TOKEN: this.token,
         // The engine stops by itself if the app dies without stopping it.
@@ -248,7 +252,8 @@ class AgentWarpEngine {
     if (!child || child.exitCode !== null) return;
     try {
       if (process.platform !== 'win32') process.kill(-child.pid, 'SIGTERM');
-      else child.kill();
+      // Windows has no process groups: end the engine with the agents it started.
+      else childProcess.spawn('taskkill', ['/pid', String(child.pid), '/T', '/F'], {stdio: 'ignore', windowsHide: true});
     } catch (e) {
       try { child.kill(); } catch (e2) { /* already gone */ }
     }
@@ -294,22 +299,77 @@ const TERMINAL_COMMANDS = new Set([
   'opencode auth login'
 ]);
 
+const LINUX_TERMINALS = [
+  ['x-terminal-emulator', ['-e']],
+  ['gnome-terminal', ['--']],
+  ['konsole', ['-e']],
+  ['xfce4-terminal', ['-x']],
+  ['kitty', []],
+  ['alacritty', ['-e']],
+  ['xterm', ['-e']]
+];
+
+const DONE_MESSAGE = 'AgentWarp: done. Close this window and press "Check again" in the agent panel.';
+
 const openInTerminal = async (command) => {
   if (!TERMINAL_COMMANDS.has(command)) throw new Error('Command not allowed');
-  if (process.platform !== 'darwin') throw new Error('Opening a terminal is only supported on macOS');
-  const file = path.join(os.tmpdir(), `agentwarp-${crypto.randomBytes(6).toString('hex')}.command`);
+  const id = crypto.randomBytes(6).toString('hex');
+  if (process.platform === 'darwin') {
+    const file = path.join(os.tmpdir(), `agentwarp-${id}.command`);
+    await fs.promises.writeFile(file, [
+      '#!/bin/zsh -l',
+      `echo '$ ${command}'`,
+      command,
+      'echo',
+      `echo '${DONE_MESSAGE}'`,
+      `rm -f '${file}'`,
+      ''
+    ].join('\n'), {mode: 0o700});
+    await new Promise((resolve, reject) => {
+      childProcess.execFile('open', ['-a', 'Terminal', file], (error) => error ? reject(error) : resolve());
+    });
+    return;
+  }
+  if (process.platform === 'win32') {
+    // npm, claude, codex and opencode are .cmd files: `call` returns to this script after each.
+    const file = path.join(os.tmpdir(), `agentwarp-${id}.cmd`);
+    await fs.promises.writeFile(file, [
+      '@echo off',
+      `echo ^> ${command}`,
+      `call ${command}`,
+      'echo.',
+      `echo ${DONE_MESSAGE}`,
+      ''
+    ].join('\r\n'));
+    const child = childProcess.spawn('cmd.exe', ['/c', 'start', '"AgentWarp"', 'cmd.exe', '/k', `"${file}"`], {
+      detached: true,
+      stdio: 'ignore',
+      windowsVerbatimArguments: true
+    });
+    child.unref();
+    return;
+  }
+  // Linux: the first terminal emulator found on PATH.
+  const file = path.join(os.tmpdir(), `agentwarp-${id}.sh`);
   await fs.promises.writeFile(file, [
-    '#!/bin/zsh -l',
+    '#!/bin/bash -l',
     `echo '$ ${command}'`,
     command,
     'echo',
-    'echo "AgentWarp: done. Close this window and press \"Check again\" in the agent panel."',
+    `echo '${DONE_MESSAGE}'`,
+    'read -r -p "Press Enter to close." _',
     `rm -f '${file}'`,
     ''
   ].join('\n'), {mode: 0o700});
-  await new Promise((resolve, reject) => {
-    childProcess.execFile('open', ['-a', 'Terminal', file], (error) => error ? reject(error) : resolve());
-  });
+  const PATH = await getShellPath();
+  for (const [terminal, args] of LINUX_TERMINALS) {
+    const found = PATH.split(path.delimiter).some((dir) => dir && fs.existsSync(path.join(dir, terminal)));
+    if (!found) continue;
+    const child = childProcess.spawn(terminal, [...args, file], {detached: true, stdio: 'ignore', env: {...process.env, PATH}});
+    child.unref();
+    return;
+  }
+  throw new Error('No terminal app found. Copy the command and run it in a terminal.');
 };
 
 module.exports = {

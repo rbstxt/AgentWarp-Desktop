@@ -1,6 +1,6 @@
 name: Build
 
-# Every push and pull request builds the macOS apps (artifacts on the run).
+# Every push and pull request builds the apps for macOS, Windows and Linux (artifacts on the run).
 # Pushing a tag like agentwarp-v0.1.0 also publishes them as a GitHub Release
 # (prefixed so TurboWarp's own v* tags from upstream never trigger a release).
 on:
@@ -14,13 +14,38 @@ permissions:
   contents: write
 
 jobs:
-  mac:
-    name: macOS ${{ matrix.arch }}
-    runs-on: macos-latest
+  build:
+    name: ${{ matrix.name }}
+    runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
       matrix:
-        arch: [arm64, x64]
+        include:
+          - name: macOS arm64
+            os: macos-latest
+            arch: arm64
+            package: --mac --arm64
+            files: dist/*.dmg
+          - name: macOS x64
+            os: macos-latest
+            arch: x64
+            package: --mac --x64
+            files: dist/*.dmg
+          - name: Windows x64
+            os: windows-latest
+            arch: x64
+            package: --windows --x64
+            files: dist/*.exe
+          - name: Linux x64
+            os: ubuntu-latest
+            arch: x64
+            package: --appimage --tarball --x64
+            files: |
+              dist/*.AppImage
+              dist/*.tar.gz
+    defaults:
+      run:
+        shell: bash
     steps:
       - name: Checkout (with the agentwarp submodule)
         uses: actions/checkout@v4
@@ -42,21 +67,21 @@ jobs:
       - name: Stage the agentwarp engine and panel
         run: node scripts/stage-agentwarp.mjs --arch=${{ matrix.arch }}
       - name: Package
-        run: node release-automation/build.mjs --mac --${{ matrix.arch }} --production
-        # Without Apple signing secrets the app is signed ad hoc (see README: first launch).
+        run: node release-automation/build.mjs ${{ matrix.package }} --production
+        # Without signing secrets: macOS is signed ad hoc, Windows is unsigned (see README).
         env:
           CSC_IDENTITY_AUTO_DISCOVERY: 'false'
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
-          name: AgentWarp-mac-${{ matrix.arch }}
-          path: dist/*.dmg
+          name: AgentWarp-${{ runner.os }}-${{ matrix.arch }}
+          path: ${{ matrix.files }}
           if-no-files-found: error
 
   release:
     name: Publish release
     if: startsWith(github.ref, 'refs/tags/agentwarp-v')
-    needs: mac
+    needs: build
     runs-on: ubuntu-latest
     steps:
       - name: Download artifacts
@@ -66,13 +91,16 @@ jobs:
           merge-multiple: true
       - name: Create the GitHub Release
         run: |
-          gh release create "$GITHUB_REF_NAME" artifacts/*.dmg \
+          gh release create "$GITHUB_REF_NAME" artifacts/* \
             --repo "$GITHUB_REPOSITORY" \
             --title "AgentWarp ${GITHUB_REF_NAME#agentwarp-}" \
-            --notes "Download the .dmg for your Mac: **arm64** for Apple Silicon (M1 and later), **x64** for Intel.
+            --notes "Downloads:
+          - **macOS**: the .dmg (**arm64** for Apple Silicon, **x64** for Intel). Not notarized yet: the first time, right-click AgentWarp in Applications and choose **Open**.
+          - **Windows** (x64): AgentWarp-Setup-….exe. Not signed yet: if SmartScreen warns, choose **More info → Run anyway**.
+          - **Linux** (x64): the .AppImage (make it executable and run it) or the .tar.gz.
 
-          Before the first run, install and sign in to at least one agent CLI (Claude Code, Codex or OpenCode). See the [setup guide](https://github.com/$GITHUB_REPOSITORY#install).
+          Windows and Linux builds are new and less tested than macOS; please report problems in Issues.
 
-          The app is not notarized yet: the first time, right-click AgentWarp in Applications and choose **Open**."
+          Before the first run you need an agent: Claude Code (Claude Pro/Max), Codex CLI (ChatGPT plans) or, without a subscription, OpenCode with its free models. The app walks you through it; see also the [setup guide](https://github.com/$GITHUB_REPOSITORY#install)."
         env:
           GH_TOKEN: ${{ github.token }}

@@ -89,15 +89,11 @@
       }
     ],
     "win": {
-      "artifactName": "${productName} Portable ${version} ${arch}.${ext}",
+      "artifactName": "${productName}-Setup-${version}-${arch}.${ext}",
       "icon": "build/icon.ico",
       "target": [
         {
           "target": "nsis",
-          "arch": "x64"
-        },
-        {
-          "target": "portable",
           "arch": "x64"
         }
       ]
@@ -158,25 +154,19 @@
       "provisioningProfile": "build/development.provisionprofile"
     },
     "linux": {
-      "executableName": "turbowarp-desktop",
+      "executableName": "agentwarp",
       "artifactName": "${productName}-${os}-${arch}-${version}.${ext}",
       "icon": "./build/",
-      "synopsis": "Mod of Scratch with a compiler and more features.",
-      "description": "TurboWarp is a Scratch mod with a compiler to run projects faster, dark mode for your eyes, a bunch of addons to improve the editor, and more.",
+      "synopsis": "TurboWarp with a coding agent built in.",
+      "description": "AgentWarp is TurboWarp (a Scratch mod) with a coding agent panel: open an .sb3 and ask Claude Code, Codex or OpenCode to work on it.",
       "category": "Development",
       "desktop": {
         "entry": {
-          "StartupWMClass": "turbowarp-desktop",
-          "Keywords": "scratch;"
+          "StartupWMClass": "agentwarp",
+          "Keywords": "scratch;turbowarp;agent;"
         }
       },
-      "extraFiles": [
-        "linux-files"
-      ],
       "target": [
-        {
-          "target": "deb"
-        },
         {
           "target": "appimage"
         },
