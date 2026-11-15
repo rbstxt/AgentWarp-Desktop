@@ -25,32 +25,47 @@ jobs:
             os: macos-latest
             arch: arm64
             package: --mac --arm64
-            files: dist/*.dmg
+            workdir: repo
+            files: repo/dist/*.dmg
           - name: macOS x64
             os: macos-latest
             arch: x64
             package: --mac --x64
-            files: dist/*.dmg
+            workdir: repo
+            files: repo/dist/*.dmg
           - name: Windows x64
             os: windows-latest
             arch: x64
             package: --windows --x64
-            files: dist/*.exe
+            # GitHub's Windows runners write to C: very slowly (npm ci there takes over an hour);
+            # build on D: like TurboWarp does.
+            workdir: D:\repo
+            files: D:\repo\dist\*.exe
           - name: Linux x64
             os: ubuntu-latest
             arch: x64
             package: --appimage --tarball --x64
+            workdir: repo
             files: |
-              dist/*.AppImage
-              dist/*.tar.gz
+              repo/dist/*.AppImage
+              repo/dist/*.tar.gz
     defaults:
       run:
         shell: bash
+        working-directory: ${{ matrix.workdir }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
         with:
           persist-credentials: false
+          path: repo
+      - name: "Windows: move the repository to D: and keep npm's cache there"
+        if: runner.os == 'Windows'
+        working-directory: .
+        run: |
+          cp -r repo /d/repo
+          rm -rf repo
+          npm config set cache 'D:\npm-cache'
       # The agentwarp submodule at its pinned commit, without eval/ (not part of the app; some of its
       # file names are not valid on Windows, so it is unpacked from the commit's tarball, not checked out).
       - name: Get the agentwarp submodule
