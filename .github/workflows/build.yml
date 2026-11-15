@@ -51,18 +51,15 @@ jobs:
         uses: actions/checkout@v4
         with:
           persist-credentials: false
-      # The agentwarp submodule, without eval/ (not part of the app; some of its file names are
-      # not valid on Windows).
-      - name: Checkout the agentwarp submodule
+      # The agentwarp submodule at its pinned commit, without eval/ (not part of the app; some of its
+      # file names are not valid on Windows, so it is unpacked from the commit's tarball, not checked out).
+      - name: Get the agentwarp submodule
         run: |
           sha=$(git rev-parse HEAD:agentwarp)
-          url=$(git config -f .gitmodules submodule.agentwarp.url)
-          rm -rf agentwarp
-          git clone --no-checkout --filter=blob:none "$url" agentwarp
-          # Windows: git refuses those names in the index even when sparse checkout leaves them out.
-          git -C agentwarp config core.protectNTFS false
-          git -C agentwarp sparse-checkout set --no-cone '/*' '!/eval/'
-          git -C agentwarp checkout --quiet "$sha"
+          repo=$(git config -f .gitmodules submodule.agentwarp.url | sed -E 's#^https://github.com/##; s#\.git$##')
+          rm -rf agentwarp && mkdir agentwarp
+          curl -fsSL "https://codeload.github.com/$repo/tar.gz/$sha" | tar -xz -C agentwarp --strip-components=1 --exclude='*/eval'
+          test -f agentwarp/packages/cli/agentwarp.ts
       - name: Install Node.js
         uses: actions/setup-node@v4
         with:
