@@ -1,7 +1,7 @@
 {
   "name": "agentwarp-desktop",
   "description": "TurboWarp with a coding agent built in: open an .sb3 and ask Claude, Codex or OpenCode.",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "license": "GPL-3.0",
   "author": {
     "name": "rbstxt (AgentWarp), Thomas Weber (TurboWarp Desktop)"
