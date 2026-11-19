@@ -14,6 +14,7 @@ const fs = require('fs');
 const net = require('net');
 const os = require('os');
 const path = require('path');
+const {windowsAgentPath} = require('./windows-path');
 
 /** The agentwarp checkout (engine + panel). */
 const findHome = () => {
@@ -74,9 +75,8 @@ const getShellPath = () => {
         path.join(os.homedir(), '.opencode', 'bin')
       ].filter(Boolean).join(path.delimiter);
       if (process.platform === 'win32') {
-        // npm installs agent CLIs into %APPDATA%\npm, which a fresh install may not have on PATH yet.
-        const npmDir = process.env.APPDATA ? path.join(process.env.APPDATA, 'npm') : null;
-        resolve([process.env[PATH_KEY], npmDir].filter(Boolean).join(path.delimiter));
+        // npm's global folder and fnm's default Node, which a Start menu launch may not have on PATH.
+        resolve(windowsAgentPath(process.env[PATH_KEY], process.env));
         return;
       }
       const shell = process.env.SHELL || '/bin/zsh';
